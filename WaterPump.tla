@@ -8,17 +8,33 @@ VARIABLES states, requestedStates, requestedPumps, onp, ofp, newLevel, oldLevel
 defcon == \/ /\ requestedPumps' = 0
              /\ newLevel > THRESHOLDS["xn"]
           \/ /\ requestedPumps' = requestedPumps - 1
-             /\ \/ oldLevel < THRESHOLDS["x11"] /\ THRESHOLDS["x11"] <= newLevel
-                \/ oldLevel < THRESHOLDS["x10"] /\THRESHOLDS["x10"] <= newLevel /\ requestedPumps > 1
-                \/ oldLevel < THRESHOLDS["x9"] /\ THRESHOLDS["x9"] <= newLevel /\ requestedPumps > 2
-                \/ oldLevel < THRESHOLDS["x8"] /\ THRESHOLDS["x8"] <= newLevel /\ requestedPumps > 3
+             /\ \/ /\oldLevel < THRESHOLDS["x11"]
+                   /\THRESHOLDS["x11"] <= newLevel
+                \/ /\oldLevel < THRESHOLDS["x10"]
+                   /\THRESHOLDS["x10"] <= newLevel
+                   /\requestedPumps > 1
+                \/ /\ oldLevel < THRESHOLDS["x9"]
+                   /\THRESHOLDS["x9"] <= newLevel
+                   /\requestedPumps > 2
+                \/ /\oldLevel < THRESHOLDS["x8"]
+                   /\THRESHOLDS["x8"] <= newLevel
+                   /\requestedPumps > 3
           \/ /\requestedPumps' = requestedPumps + 1
-             /\ \/ oldLevel >= THRESHOLDS["x7"] /\ THRESHOLDS["x7"] > newLevel /\ requestedPumps < 1
-                \/ oldLevel >= THRESHOLDS["x6"] /\ THRESHOLDS["x6"]> newLevel /\ requestedPumps < 2
-                \/ oldLevel >= THRESHOLDS["x4"] /\ THRESHOLDS["x4"] > newLevel /\ requestedPumps < 3
+             /\ \/ /\oldLevel >= THRESHOLDS["x7"]
+                   /\THRESHOLDS["x7"] > newLevel
+                   /\requestedPumps < 1
+                \/ /\oldLevel >= THRESHOLDS["x6"]
+                   /\THRESHOLDS["x6"]> newLevel
+                   /\requestedPumps < 2
+                \/ /\oldLevel >= THRESHOLDS["x4"]
+                   /\THRESHOLDS["x4"] > newLevel
+                   /\requestedPumps < 3
           \/ /\requestedPumps' = 4
-             /\ \/ oldLevel < THRESHOLDS["x5"] /\ THRESHOLDS["x5"] <= newLevel /\ requestedPumps > 4
-                \/ oldLevel >= THRESHOLDS["x3"] /\ THRESHOLDS["x3"] > newLevel
+             /\ \/ /\oldLevel < THRESHOLDS["x5"]
+                   /\THRESHOLDS["x5"] <= newLevel
+                   /\requestedPumps > 4
+                \/ /\oldLevel >= THRESHOLDS["x3"]
+                   /\ THRESHOLDS["x3"] > newLevel
           \/ /\requestedPumps' = 5
              /\ \/ oldLevel >= THRESHOLDS["x2"] /\THRESHOLDS["x2"] > newLevel
                 \/ oldLevel < THRESHOLDS["x1"] /\ THRESHOLDS["x1"] <= newLevel
@@ -45,9 +61,8 @@ deactivate(p) == /\IF (p >= 0 /\ p < 3)
 
 selectPumps ==
   /\ \A p \in PUMPS : states[p] \notin {"STARTING", "STOPPING"}
-  /\ defcon
-  /\ Cardinality({p \in PUMPS : states[p] = "ON"}) # requestedPumps'
-  /\ IF Cardinality({p \in PUMPS : states[p] = "ON"}) < requestedPumps'
+  /\ Cardinality({p \in PUMPS : states[p] = "ON"}) # requestedPumps
+  /\ IF Cardinality({p \in PUMPS : states[p] = "ON"}) < requestedPumps
      THEN \E p \in PUMPS : activate(p)
      ELSE \E p \in PUMPS : deactivate(p)
 
@@ -66,14 +81,16 @@ failureOFF(p) == /\states' = [states EXCEPT ![p] = "DAMAGED"]
 switchON(p) == /\states[p] = "OFF"
                /\requestedStates[p] = "ON"
                /\states' = [states EXCEPT ![p] = "STARTING"]
-               /\ (successON(p) /\failureON(p))
+               /\ \/ successON(p)
+                  \/ failureON(p)
 
 switchOFF(p) == /\states[p] = "ON"
                 /\requestedStates[p] = "OFF"
                 /\states' = [states EXCEPT ![p] = "STOPING"]
-                /\ (successOFF(p) /\failureOFF(p))
+                /\ \/ successOFF(p)
+                   \/ failureOFF(p)
 
-switchPumps == \E p \in PUMPS : switchON(p) /\switchOFF(p)
+switchPumps == \E p \in PUMPS : switchON(p) \/ switchOFF(p)
 
 WPInit == /\states = [p \in PUMPS |-> "OFF"]
           /\requestedStates = [p \in PUMPS |-> "OFF"]
@@ -84,9 +101,15 @@ WPInit == /\states = [p \in PUMPS |-> "OFF"]
           /\ oldLevel = 120
 
 
-WPNext == \/ newLevel' = newLevel-1 /\ oldLevel' = newLevel /\ UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
-          \/ selectPumps /\ UNCHANGED <<oldLevel, newLevel, states>>
-          \/ switchPumps /\ UNCHANGED <<oldLevel, newLevel, requestedPumps, onp, ofp>>
+WPNext == \/ /\newLevel' = newLevel-1
+             /\oldLevel' = newLevel
+             /\UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
+          \/ /\selectPumps
+             /\ UNCHANGED <<oldLevel, newLevel, states>>
+          \/ /\switchPumps
+             /\ UNCHANGED <<oldLevel, newLevel, requestedPumps, onp, ofp>>
+          \/ /\defcon
+             /\UNCHANGED <<oldLevel, newLevel, states, requestedStates, onp, ofp>>
 =============================================================================
 \* Modification History
 \* Last modified Mon Jul 13 19:32:28 BRT 2020 by gabriela
