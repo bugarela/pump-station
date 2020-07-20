@@ -53,8 +53,6 @@ defcon == \/ defcon6
           \/ defcon4
           \/ defconPlus1
           \/ defconMinus1
-          \/ UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
-
 
 activate(p) == /\IF (p >= 0 /\ p < 3)
                  THEN /\onp = p
@@ -130,5 +128,5 @@ WPNext == \/ /\newLevel' = newLevel-10
              /\ UNCHANGED <<oldLevel, newLevel, requestedPumps, onp, ofp>>   
 =============================================================================
 \* Modification History
-\* Last modified Sun Jul 19 21:38:15 BRT 2020 by gabriela
+\* Last modified Mon Jul 20 13:46:44 BRT 2020 by gabriela
 \* Created Wed Jun 10 07:11:49 BRT 2020 by gabriela
