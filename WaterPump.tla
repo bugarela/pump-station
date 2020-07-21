@@ -54,25 +54,27 @@ defcon == \/ defcon6
           \/ defconPlus1
           \/ defconMinus1
 
-activate(p) == /\IF (p >= 0 /\ p < 3)
-                 THEN /\onp = p
-                      /\onp' = (p + 1) % 3
-                 ELSE onp' = onp
-               /\states[p] = "OFF"
+activate(p) == /\states[p] = "OFF"
                /\requestedStates' = [requestedStates EXCEPT ![p] = "ON"]
                /\ UNCHANGED <<ofp>>
+               /\IF (p >= 0 /\ p < 3)
+                 THEN /\onp = p
+                      /\onp' = (p + 1) % 3
+                 ELSE /\ \A i \in 0..2 : states[i] \notin {"OFF"}
+                      /\onp' = onp
 
-deactivate(p) == /\IF (p >= 0 /\ p < 3)
-                   THEN /\ofp = p
-                        /\ofp' = (p + 1) % 3
-                   ELSE ofp' = ofp
-                 /\states[p] = "ON"
+deactivate(p) == /\states[p] = "ON"
                  /\requestedStates' = [requestedStates EXCEPT ![p] = "OFF"]
                  /\ UNCHANGED <<onp>>
+                 /\IF (p >= 0 /\ p < 3)
+                   THEN /\ \A i \in 3..4 : states[i] \notin {"ON"}
+                        /\ofp = p
+                        /\ofp' = (p + 1) % 3
+                   ELSE ofp' = ofp
 
 selectPumps ==
   /\ \A p \in PUMPS : states[p] \notin {"STARTING", "STOPPING"}
-  /\ Cardinality({p \in PUMPS : states[p] = "ON"}) # requestedPumps
+  /\ Cardinality({p \in PUMPS : requestedStates[p] = "ON"}) # requestedPumps
   /\ IF Cardinality({p \in PUMPS : states[p] = "ON"}) < requestedPumps
      THEN \E p \in PUMPS : activate(p)
      ELSE \E p \in PUMPS : deactivate(p)
@@ -111,22 +113,35 @@ WPInit == /\states = [p \in PUMPS |-> "OFF"]
           /\ newLevel = 120
           /\ oldLevel = 120
 
+waterLevelUp == /\newLevel' = newLevel + 10
+                /\UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
 
-WPNext == \/ /\newLevel' = newLevel-10
-             /\oldLevel' = newLevel
-             /\UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
-          \/ /\selectPumps
-             /\ UNCHANGED <<oldLevel, newLevel, states, requestedPumps>>
-          \/ /\switchPumps
-             /\ UNCHANGED <<oldLevel, newLevel, requestedPumps, onp, ofp, requestedStates>>
-          \/ /\defcon
-             /\UNCHANGED <<oldLevel, newLevel, states, requestedStates, onp, ofp>>
-          \/ /\ \E p \in PUMPS : \/ successON(p)
-                                 \/ successOFF(p)
-                                 \/ failureON(p)
-                                 \/ failureOFF(p)
-             /\ UNCHANGED <<oldLevel, newLevel, requestedPumps, onp, ofp>>   
+waterLevelDown == /\newLevel' = newLevel - 10
+                  /\UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
+
+defconCalculation == /\defcon
+                     /\UNCHANGED <<newLevel, states, requestedStates, onp, ofp>>
+
+pumpSelection == /\selectPumps
+                 /\ UNCHANGED <<newLevel, states, requestedPumps>>
+
+pumpSwitching == /\switchPumps
+                 /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp, requestedStates>>
+
+pumpStatusCheck == /\ \E p \in PUMPS : \/ successON(p)
+                                       \/ successOFF(p)
+                                       \/ failureON(p)
+                                       \/ failureOFF(p)
+                   /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp>> 
+
+WPNext == /\ oldLevel' = newLevel
+          /\ \/ defconCalculation
+             \/ pumpSelection
+             \/ pumpSwitching
+             \/ pumpStatusCheck
+             \/ waterLevelUp
+             \/ waterLevelDown
 =============================================================================
 \* Modification History
-\* Last modified Mon Jul 20 13:46:44 BRT 2020 by gabriela
+\* Last modified Mon Jul 20 19:15:01 BRT 2020 by gabriela
 \* Created Wed Jun 10 07:11:49 BRT 2020 by gabriela
