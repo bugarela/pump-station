@@ -3,7 +3,7 @@ defmodule PumpController.MixProject do
 
   def project do
     [
-      app: :mqtt,
+      app: :pump_controller,
       version: "0.1.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
@@ -14,7 +14,7 @@ defmodule PumpController.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :tortoise],
       mod: {PumpController.Application, []}
     ]
   end

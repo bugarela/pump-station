@@ -322,8 +322,12 @@ defmodule WaterPump do
 
   def activate_condition(variables, p) do
     Enum.all?([
-      if(p >= 0 and p < 3, do: variables[:onp] == p, else: True),
-      variables[:states][p] == "OFF"
+      variables[:states][p] == "OFF",
+      if(p >= 0 and p < 3,
+        do: variables[:onp] == p,
+        else:
+          Enum.all?(0..2, fn i -> not Enum.member?(MapSet.new(["OFF"]), variables[:states][i]) end)
+      )
     ])
   end
 
@@ -346,8 +350,17 @@ defmodule WaterPump do
 
   def deactivate_condition(variables, p) do
     Enum.all?([
-      if(p >= 0 and p < 3, do: variables[:ofp] == p, else: True),
-      variables[:states][p] == "ON"
+      variables[:states][p] == "ON",
+      if(p >= 0 and p < 3,
+        do:
+          Enum.all?([
+            Enum.all?(3..4, fn i ->
+              not Enum.member?(MapSet.new(["ON"]), variables[:states][i])
+            end),
+            variables[:ofp] == p
+          ]),
+        else: True
+      )
     ])
   end
 
@@ -373,7 +386,7 @@ defmodule WaterPump do
       Enum.all?(@pumps, fn p ->
         not Enum.member?(MapSet.new(["STARTING", "STOPPING"]), variables[:states][p])
       end),
-      Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) !=
+      Enum.count(Enum.filter(@pumps, fn p -> variables[:requested_states][p] == "ON" end)) !=
         variables[:requested_pumps],
       if(
         Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) <
@@ -508,143 +521,193 @@ defmodule WaterPump do
     )
   end
 
+  def water_level_up_condition(variables) do
+    True
+  end
+
+  def water_level_up(variables) do
+    %{
+      new_level: variables[:new_level] + 10,
+      states: variables[:states],
+      requested_states: variables[:requested_states],
+      requested_pumps: variables[:requested_pumps],
+      onp: variables[:onp],
+      ofp: variables[:ofp]
+    }
+  end
+
+  def water_level_down_condition(variables) do
+    True
+  end
+
+  def water_level_down(variables) do
+    %{
+      new_level: variables[:new_level] - 10,
+      states: variables[:states],
+      requested_states: variables[:requested_states],
+      requested_pumps: variables[:requested_pumps],
+      onp: variables[:onp],
+      ofp: variables[:ofp]
+    }
+  end
+
+  def defcon_calculation_condition(variables) do
+    defcon_condition(variables)
+  end
+
+  def defcon_calculation(variables) do
+    Map.merge(
+      %{
+        new_level: variables[:new_level],
+        states: variables[:states],
+        requested_states: variables[:requested_states],
+        onp: variables[:onp],
+        ofp: variables[:ofp]
+      },
+      defcon(variables)
+    )
+  end
+
+  def pump_selection_condition(variables) do
+    select_pumps_condition(variables)
+  end
+
+  def pump_selection(variables) do
+    Map.merge(
+      %{
+        new_level: variables[:new_level],
+        states: variables[:states],
+        requested_pumps: variables[:requested_pumps]
+      },
+      select_pumps(variables)
+    )
+  end
+
+  def pump_switching_condition(variables) do
+    switch_pumps_condition(variables)
+  end
+
+  def pump_switching(variables) do
+    Map.merge(
+      %{
+        new_level: variables[:new_level],
+        requested_pumps: variables[:requested_pumps],
+        onp: variables[:onp],
+        ofp: variables[:ofp],
+        requested_states: variables[:requested_states]
+      },
+      switch_pumps(variables)
+    )
+  end
+
+  def pump_status_check_condition(variables) do
+    Enum.any?(@pumps, fn p ->
+      Enum.any?([
+        success_on_condition(variables, p),
+        success_off_condition(variables, p),
+        failure_on_condition(variables, p),
+        failure_off_condition(variables, p)
+      ])
+    end)
+  end
+
+  def pump_status_check(variables) do
+    Map.merge(
+      %{
+        new_level: variables[:new_level],
+        requested_pumps: variables[:requested_pumps],
+        onp: variables[:onp],
+        ofp: variables[:ofp]
+      },
+      decide_action(
+        List.flatten([
+          Enum.map(@pumps, fn p ->
+            [
+              %{
+                action:
+                  "ActionOr [ActionCall \"successON\" [\"p\"\],ActionCall \"successOFF\" [\"p\"\],ActionCall \"failureON\" [\"p\"\],ActionCall \"failureOFF\" [\"p\"\]\]",
+                condition:
+                  Enum.any?([
+                    success_on_condition(variables, p),
+                    success_off_condition(variables, p),
+                    failure_on_condition(variables, p),
+                    failure_off_condition(variables, p)
+                  ]),
+                state:
+                  decide_action(
+                    List.flatten([
+                      %{
+                        action: "successON(#{inspect(p)})",
+                        condition: success_on_condition(variables, p),
+                        state: success_on(variables, p)
+                      },
+                      %{
+                        action: "successOFF(#{inspect(p)})",
+                        condition: success_off_condition(variables, p),
+                        state: success_off(variables, p)
+                      },
+                      %{
+                        action: "failureON(#{inspect(p)})",
+                        condition: failure_on_condition(variables, p),
+                        state: failure_on(variables, p)
+                      },
+                      %{
+                        action: "failureOFF(#{inspect(p)})",
+                        condition: failure_off_condition(variables, p),
+                        state: failure_off(variables, p)
+                      }
+                    ])
+                  )
+              }
+            ]
+          end)
+        ])
+      )
+    )
+  end
+
   def main(variables) do
     IO.puts(inspect(variables))
 
     main(
-      decide_action(
-        List.flatten([
-          %{
-            action:
-              "ActionAnd [Primed \"newLevel\" \(Arith \(Sub \(Ref \"newLevel\"\) \(Num 10\)\)\),Primed \"oldLevel\" \(Arith \(Ref \"newLevel\"\)\),Unchanged [\"states\",\"requestedStates\",\"requestedPumps\",\"onp\",\"ofp\"\]\]",
-            condition: True,
-            state: %{
-              new_level: variables[:new_level] - 10,
-              old_level: variables[:new_level],
-              states: variables[:states],
-              requested_states: variables[:requested_states],
-              requested_pumps: variables[:requested_pumps],
-              onp: variables[:onp],
-              ofp: variables[:ofp]
+      Map.merge(
+        %{
+          old_level: variables[:new_level]
+        },
+        decide_action(
+          List.flatten([
+            %{
+              action: "defconCalculation()",
+              condition: defcon_calculation_condition(variables),
+              state: defcon_calculation(variables)
+            },
+            %{
+              action: "pumpSelection()",
+              condition: pump_selection_condition(variables),
+              state: pump_selection(variables)
+            },
+            %{
+              action: "pumpSwitching()",
+              condition: pump_switching_condition(variables),
+              state: pump_switching(variables)
+            },
+            %{
+              action: "pumpStatusCheck()",
+              condition: pump_status_check_condition(variables),
+              state: pump_status_check(variables)
+            },
+            %{
+              action: "waterLevelUp()",
+              condition: water_level_up_condition(variables),
+              state: water_level_up(variables)
+            },
+            %{
+              action: "waterLevelDown()",
+              condition: water_level_down_condition(variables),
+              state: water_level_down(variables)
             }
-          },
-          %{
-            action:
-              "ActionAnd [ActionCall \"selectPumps\" [\],Unchanged [\"oldLevel\",\"newLevel\",\"states\",\"requestedPumps\"\]\]",
-            condition: select_pumps_condition(variables),
-            state:
-              Map.merge(
-                %{
-                  old_level: variables[:old_level],
-                  new_level: variables[:new_level],
-                  states: variables[:states],
-                  requested_pumps: variables[:requested_pumps]
-                },
-                select_pumps(variables)
-              )
-          },
-          %{
-            action:
-              "ActionAnd [ActionCall \"switchPumps\" [\],Unchanged [\"oldLevel\",\"newLevel\",\"requestedPumps\",\"onp\",\"ofp\",\"requestedStates\"\]\]",
-            condition: switch_pumps_condition(variables),
-            state:
-              Map.merge(
-                %{
-                  old_level: variables[:old_level],
-                  new_level: variables[:new_level],
-                  requested_pumps: variables[:requested_pumps],
-                  onp: variables[:onp],
-                  ofp: variables[:ofp],
-                  requested_states: variables[:requested_states]
-                },
-                switch_pumps(variables)
-              )
-          },
-          %{
-            action:
-              "ActionAnd [ActionCall \"defcon\" [\],Unchanged [\"oldLevel\",\"newLevel\",\"states\",\"requestedStates\",\"onp\",\"ofp\"\]\]",
-            condition: defcon_condition(variables),
-            state:
-              Map.merge(
-                %{
-                  old_level: variables[:old_level],
-                  new_level: variables[:new_level],
-                  states: variables[:states],
-                  requested_states: variables[:requested_states],
-                  onp: variables[:onp],
-                  ofp: variables[:ofp]
-                },
-                defcon(variables)
-              )
-          },
-          %{
-            action:
-              "ActionAnd [Exists \"p\" \(Arith \(Ref \"PUMPS\"\)\) \(ActionOr [ActionOr [ActionCall \"successON\" [\"p\"\],ActionCall \"successOFF\" [\"p\"\],ActionCall \"failureON\" [\"p\"\],ActionCall \"failureOFF\" [\"p\"\]\]\]\),Unchanged [\"oldLevel\",\"newLevel\",\"requestedPumps\",\"onp\",\"ofp\"\]\]",
-            condition:
-              Enum.any?(@pumps, fn p ->
-                Enum.any?([
-                  success_on_condition(variables, p),
-                  success_off_condition(variables, p),
-                  failure_on_condition(variables, p),
-                  failure_off_condition(variables, p)
-                ])
-              end),
-            state:
-              Map.merge(
-                %{
-                  old_level: variables[:old_level],
-                  new_level: variables[:new_level],
-                  requested_pumps: variables[:requested_pumps],
-                  onp: variables[:onp],
-                  ofp: variables[:ofp]
-                },
-                decide_action(
-                  List.flatten([
-                    Enum.map(@pumps, fn p ->
-                      [
-                        %{
-                          action:
-                            "ActionOr [ActionCall \"successON\" [\"p\"\],ActionCall \"successOFF\" [\"p\"\],ActionCall \"failureON\" [\"p\"\],ActionCall \"failureOFF\" [\"p\"\]\]",
-                          condition:
-                            Enum.any?([
-                              success_on_condition(variables, p),
-                              success_off_condition(variables, p),
-                              failure_on_condition(variables, p),
-                              failure_off_condition(variables, p)
-                            ]),
-                          state:
-                            decide_action(
-                              List.flatten([
-                                %{
-                                  action: "successON(#{inspect(p)})",
-                                  condition: success_on_condition(variables, p),
-                                  state: success_on(variables, p)
-                                },
-                                %{
-                                  action: "successOFF(#{inspect(p)})",
-                                  condition: success_off_condition(variables, p),
-                                  state: success_off(variables, p)
-                                },
-                                %{
-                                  action: "failureON(#{inspect(p)})",
-                                  condition: failure_on_condition(variables, p),
-                                  state: failure_on(variables, p)
-                                },
-                                %{
-                                  action: "failureOFF(#{inspect(p)})",
-                                  condition: failure_off_condition(variables, p),
-                                  state: failure_off(variables, p)
-                                }
-                              ])
-                            )
-                        }
-                      ]
-                    end)
-                  ])
-                )
-              )
-          }
-        ])
+          ])
+        )
       )
     )
   end
@@ -673,13 +736,3 @@ defmodule WaterPump do
     end
   end
 end
-
-WaterPump.main(%{
-  states: WaterPump.pumps() |> Enum.map(fn p -> {p, "OFF"} end) |> Enum.into(%{}),
-  requested_states: WaterPump.pumps() |> Enum.map(fn p -> {p, "OFF"} end) |> Enum.into(%{}),
-  onp: 0,
-  ofp: 0,
-  requested_pumps: 0,
-  new_level: 120,
-  old_level: 120
-})

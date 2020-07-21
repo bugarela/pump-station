@@ -1,4 +1,4 @@
-defmodule Mqtt.Application do
+defmodule PumpController.Application do
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
@@ -7,6 +7,7 @@ defmodule Mqtt.Application do
 
   require Tortoise
   require Logger
+  require WaterPump
 
   def start(_type, _args) do
     import Supervisor.Spec, warn: false
@@ -19,31 +20,30 @@ defmodule Mqtt.Application do
     ]
 
     {:ok, pid} =
-      Supervisor.start_link(children, strategy: :one_for_one, name: MqttManager.Supervisor)
+      Supervisor.start_link(children, strategy: :one_for_one, name: PumpControllerManager.Supervisor)
 
-    a = Tortoise.Supervisor.start_child(
+    supervisor = Tortoise.Supervisor.start_child(
       MyApp.Connection.Supervisor,
       client_id: "aaa",
-      handler: {Tortoise.Handler.Logger, []} ,
+      handler: {SensorsHandler, []},
       user_name: "pumps",
       password: "pumps",
       server: {Tortoise.Transport.Tcp, host: "localhost", port: 8883},
-      subscriptions: [{"test", 0}]
+      subscriptions: [{"water_level", 0}, {"pumps/+/state", 0}]
     )
 
-    Logger.info(inspect a)
-    b = Tortoise.Connection.subscribe(WaterPump, "test", qos: 0)
-    Logger.info(inspect b)
+    Logger.info(inspect supervisor)
 
-    listen
+    WaterPump.main(%{
+          states: WaterPump.pumps() |> Enum.map(fn p -> {p, "OFF"} end) |> Enum.into(%{}),
+          requested_states: WaterPump.pumps() |> Enum.map(fn p -> {p, "OFF"} end) |> Enum.into(%{}),
+          onp: 0,
+          ofp: 0,
+          requested_pumps: 0,
+          new_level: 120,
+          old_level: 120
+    })
+
     {:ok, pid}
-  end
-
-  def listen do
-    receive do
-      {p, as} -> Logger.debug(inspect p)
-    end
-
-    listen()
   end
 end
