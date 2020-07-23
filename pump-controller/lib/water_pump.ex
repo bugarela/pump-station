@@ -2,7 +2,7 @@ defmodule WaterPump do
   require Oracle
   @oracle spawn(Oracle, :start, [])
 
-  @pumps [0, 1, 2, 3, 4, 5]
+  @pumps [0, 1, 2, 3, 4]
   def pumps, do: @pumps
 
   @thresholds %{
@@ -667,7 +667,7 @@ defmodule WaterPump do
   end
 
   def main(variables) do
-    IO.puts(inspect(variables))
+    IO.inspect(variables)
 
     main(
       Map.merge(

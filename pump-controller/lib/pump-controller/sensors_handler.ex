@@ -25,9 +25,7 @@ defmodule SensorsHandler do
     # :ok = Temperature.record(room, payload)
     {p, ""} = Integer.parse(pump)
 
-    if payload != state[:pumps][p] do
-      send :global.whereis_name("oracle"), { :pump_status_change, pump, payload }
-    end
+    send :global.whereis_name("oracle"), { :pump_status_change, pump, payload }
 
     state = %{state | pumps: %{ state[:pumps] | p => payload }}
 

@@ -12,16 +12,16 @@ defmodule Oracle do
     IO.puts "Oracle at [#{inspect self()}] is listening"
 
     receive do
-      {p, as} when not is_atom(p) -> options = input_option(as); IO.inspect(options); send p, {:ok, options}
+      {p, as} when not is_atom(p) -> send p, {:ok, input_option(as)}
     end
 
     listen()
   end
 
   def input_option(actions) do
+    IO.puts("Possible actions:")
     IO.inspect(actions)
     enumerated_actions = actions |> Enum.with_index |> Enum.map(fn({x, i}) -> "#{i} => #{x}" end)
-    IO.puts (inspect enumerated_actions)
 
     [action, parameters] =  Enum.at(actions, 0)|> String.split("(")
     parameter = parameters |> String.trim_trailing(")")

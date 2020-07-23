@@ -32,7 +32,7 @@ defmodule PumpController.Application do
       subscriptions: [{"water_level", 0}, {"pumps/+/state", 0}]
     )
 
-    Logger.info(inspect supervisor)
+    IO.puts("Subscriber listening: " <> inspect supervisor)
 
     WaterPump.main(%{
           states: WaterPump.pumps() |> Enum.map(fn p -> {p, "OFF"} end) |> Enum.into(%{}),
