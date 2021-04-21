@@ -1,28 +1,24 @@
 ----------------------------- MODULE WaterPump -----------------------------
-EXTENDS Integers, FiniteSets
+EXTENDS Integers, FiniteSets, TLC
 
 CONSTANT PUMPS, THRESHOLDS
 
 VARIABLES states, requestedStates, requestedPumps, onp, ofp, newLevel, oldLevel
 
-defcon6 == /\requestedPumps' = 6
-           /\newLevel < THRESHOLDS["x1"]
+defcon6 == /\newLevel < THRESHOLDS["x1"]
 
-defcon5 == /\requestedPumps' = 5
-           /\ \/ /\oldLevel >= THRESHOLDS["x2"]
+defcon5 == /\ \/ /\oldLevel >= THRESHOLDS["x2"]
                  /\THRESHOLDS["x2"] > newLevel
               \/ /\oldLevel < THRESHOLDS["x1"]
                  /\ THRESHOLDS["x1"] <=newLevel
 
-defcon4 == /\requestedPumps' = 4
-           /\ \/ /\oldLevel < THRESHOLDS["x5"]
+defcon4 == /\ \/ /\oldLevel < THRESHOLDS["x5"]
                  /\THRESHOLDS["x5"] <= newLevel
                  /\requestedPumps > 4
               \/ /\oldLevel >= THRESHOLDS["x3"]
                  /\THRESHOLDS["x3"] > newLevel
 
-defconPlus1 == /\requestedPumps' = requestedPumps + 1
-               /\ \/ /\oldLevel >= THRESHOLDS["x7"]
+defconPlus1 == /\ \/ /\oldLevel >= THRESHOLDS["x7"]
                      /\THRESHOLDS["x7"] > newLevel
                      /\requestedPumps < 1
                   \/ /\oldLevel >= THRESHOLDS["x6"]
@@ -32,8 +28,7 @@ defconPlus1 == /\requestedPumps' = requestedPumps + 1
                      /\THRESHOLDS["x4"] > newLevel
                      /\requestedPumps < 3
 
-defconMinus1 == /\requestedPumps' = requestedPumps - 1
-                /\ \/ /\oldLevel < THRESHOLDS["x11"]
+defconMinus1 == /\ \/ /\oldLevel < THRESHOLDS["x11"]
                       /\THRESHOLDS["x11"] <= newLevel
                    \/ /\oldLevel < THRESHOLDS["x10"]
                       /\THRESHOLDS["x10"] <= newLevel
@@ -45,14 +40,16 @@ defconMinus1 == /\requestedPumps' = requestedPumps - 1
                       /\THRESHOLDS["x8"] <= newLevel
                       /\requestedPumps > 3
 
-defcon0 == /\ requestedPumps' = 0
-           /\ newLevel > THRESHOLDS["xn"]
+defcon0 == /\ newLevel > THRESHOLDS["xn"]
 
-defcon == \/ defcon6
-          \/ defcon5
-          \/ defcon4
-          \/ defconPlus1
-          \/ defconMinus1
+defcon == [x \in 0..6 |->
+  CASE defcon6 -> 6
+     []defcon5 -> 5
+     []defcon0 -> 0
+     []defconPlus1 -> requestedPumps + 1
+     []defconMinus1 -> requestedPumps - 1
+     []OTHER -> requestedPumps
+]
 
 activate(p) == /\states[p] = "OFF"
                /\requestedStates' = [requestedStates EXCEPT ![p] = "ON"]
@@ -60,24 +57,27 @@ activate(p) == /\states[p] = "OFF"
                /\IF (p >= 0 /\ p < 3)
                  THEN /\onp = p
                       /\onp' = (p + 1) % 3
-                 ELSE /\ \A i \in 0..2 : states[i] \notin {"OFF"}
+                 ELSE /\ \A i \in 0..2 : requestedStates[i] \notin {"OFF"}
+                      /\ \A i \in 0..2 : states[i] \notin {"OFF"}
                       /\onp' = onp
 
 deactivate(p) == /\states[p] = "ON"
                  /\requestedStates' = [requestedStates EXCEPT ![p] = "OFF"]
                  /\ UNCHANGED <<onp>>
                  /\IF (p >= 0 /\ p < 3)
-                   THEN /\ \A i \in 3..4 : states[i] \notin {"ON"}
+                   THEN /\ \A i \in 3..4 : requestedStates[i] \notin {"ON"}
+                        /\ \A i \in 3..4 : states[i] \notin {"ON"}
                         /\ofp = p
                         /\ofp' = (p + 1) % 3
                    ELSE ofp' = ofp
 
-selectPumps ==
+selectPumps(pumpCount) ==
   /\ \A p \in PUMPS : states[p] \notin {"STARTING", "STOPPING"}
-  /\ Cardinality({p \in PUMPS : requestedStates[p] = "ON"}) # requestedPumps
-  /\ IF Cardinality({p \in PUMPS : states[p] = "ON"}) < requestedPumps
+  /\ IF Cardinality({p \in PUMPS : states[p] = "ON"}) < pumpCount
      THEN \E p \in PUMPS : activate(p)
-     ELSE \E p \in PUMPS : deactivate(p)
+     ELSE IF Cardinality({p \in PUMPS : states[p] = "ON"}) > pumpCount
+          THEN \E p \in PUMPS : deactivate(p)
+          ELSE UNCHANGED <<states, requestedStates, ofp, onp>>
 
 successON(p) == /\states[p] = "STARTING"
                 /\states' = [states EXCEPT ![p] = "ON"]
@@ -119,11 +119,9 @@ waterLevelUp == /\newLevel' = newLevel + 10
 waterLevelDown == /\newLevel' = newLevel - 10
                   /\UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
 
-defconCalculation == /\defcon
-                     /\UNCHANGED <<newLevel, states, requestedStates, onp, ofp>>
-
-pumpSelection == /\selectPumps
-                 /\ UNCHANGED <<newLevel, states, requestedPumps>>
+pumpSelection == /\requestedPumps' = defcon[requestedPumps]
+                 /\selectPumps(defcon[requestedPumps])
+                 /\ UNCHANGED <<newLevel, states>>
 
 pumpSwitching == /\switchPumps
                  /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp, requestedStates>>
@@ -132,15 +130,18 @@ pumpStatusCheck == /\ \E p \in PUMPS : \/ successON(p)
                                        \/ successOFF(p)
                                        \/ failureON(p)
                                        \/ failureOFF(p)
-                   /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp>> 
+                   /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp>>
+
+algorithmStep == IF Cardinality({p \in PUMPS : states[p] = "ON"}) # requestedPumps
+                 THEN pumpSwitching
+                 ELSE pumpSelection \/ pumpStatusCheck
 
 WPNext == /\ oldLevel' = newLevel
-          /\ \/ defconCalculation
-             \/ pumpSelection
-             \/ pumpSwitching
-             \/ pumpStatusCheck
+          /\ \/ algorithmStep
              \/ waterLevelUp
              \/ waterLevelDown
+
+Spec == WPInit /\[][WPNext]_<< states, requestedStates, requestedPumps, onp, ofp, newLevel, oldLevel >>
 =============================================================================
 \* Modification History
 \* Last modified Mon Jul 20 19:15:01 BRT 2020 by gabriela
