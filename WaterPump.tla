@@ -1,9 +1,9 @@
 ----------------------------- MODULE WaterPump -----------------------------
 EXTENDS Integers, FiniteSets, TLC
 
-CONSTANT PUMPS, THRESHOLDS
+CONSTANT PUMPS, ALTERNATION_PUMPS, THRESHOLDS
 
-VARIABLES states, requestedStates, requestedPumps, onp, ofp, newLevel, oldLevel
+VARIABLES states, requestedStates, requestedPumps, onp, ofp, newLevel, oldLevel, timesActivated
 
 defcon6 == /\newLevel < THRESHOLDS["x1"]
 
@@ -51,33 +51,44 @@ defcon == [x \in 0..6 |->
      []OTHER -> requestedPumps
 ]
 
+updateActivationCounter(p) == /\IF \A p2 \in ALTERNATION_PUMPS : p = p2 \/ timesActivated[p2] = 1
+                                THEN timesActivated' = [p2 \in ALTERNATION_PUMPS |-> 0]
+                                ELSE timesActivated' = [timesActivated EXCEPT ![p] = timesActivated[p] + 1]
+
 activate(p) == /\states[p] = "OFF"
                /\requestedStates' = [requestedStates EXCEPT ![p] = "ON"]
                /\ UNCHANGED <<ofp>>
-               /\IF (p >= 0 /\ p < 3)
+               /\IF p \in ALTERNATION_PUMPS
                  THEN /\onp = p
                       /\onp' = (p + 1) % 3
-                 ELSE /\ \A i \in 0..2 : requestedStates[i] \notin {"OFF"}
-                      /\ \A i \in 0..2 : states[i] \notin {"OFF"}
-                      /\onp' = onp
+                      /\updateActivationCounter(p)
+                 ELSE
+                      /\IF p = 3
+                        THEN /\ \A i \in ALTERNATION_PUMPS : requestedStates[i] \notin {"OFF"}
+                             /\ \A i \in ALTERNATION_PUMPS : states[i] \notin {"OFF"}
+                        ELSE /\ \A i \in 0..3 : requestedStates[i] \notin {"OFF"}
+                             /\ \A i \in 0..3 : states[i] \notin {"OFF"}
+                      /\UNCHANGED <<onp, timesActivated>>
+
 
 deactivate(p) == /\states[p] = "ON"
                  /\requestedStates' = [requestedStates EXCEPT ![p] = "OFF"]
-                 /\ UNCHANGED <<onp>>
-                 /\IF (p >= 0 /\ p < 3)
+                 /\UNCHANGED <<onp, timesActivated>>
+                 /\IF p \in ALTERNATION_PUMPS
                    THEN /\ \A i \in 3..4 : requestedStates[i] \notin {"ON"}
                         /\ \A i \in 3..4 : states[i] \notin {"ON"}
                         /\ofp = p
                         /\ofp' = (p + 1) % 3
-                   ELSE ofp' = ofp
+                   ELSE UNCHANGED <<ofp>>
 
 selectPumps(pumpCount) ==
+  /\requestedPumps' = pumpCount
   /\ \A p \in PUMPS : states[p] \notin {"STARTING", "STOPPING"}
   /\ IF Cardinality({p \in PUMPS : states[p] = "ON"}) < pumpCount
      THEN \E p \in PUMPS : activate(p)
      ELSE IF Cardinality({p \in PUMPS : states[p] = "ON"}) > pumpCount
           THEN \E p \in PUMPS : deactivate(p)
-          ELSE UNCHANGED <<states, requestedStates, ofp, onp>>
+          ELSE UNCHANGED <<states, requestedStates, ofp, onp, timesActivated>>
 
 successON(p) == /\states[p] = "STARTING"
                 /\states' = [states EXCEPT ![p] = "ON"]
@@ -112,36 +123,37 @@ WPInit == /\states = [p \in PUMPS |-> "OFF"]
           /\requestedPumps = 0
           /\ newLevel = 120
           /\ oldLevel = 120
+          /\timesActivated = [p \in ALTERNATION_PUMPS |-> 0]
 
 waterLevelUp == /\newLevel' = newLevel + 10
-                /\UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
 
 waterLevelDown == /\newLevel' = newLevel - 10
-                  /\UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp>>
 
-pumpSelection == /\requestedPumps' = defcon[requestedPumps]
-                 /\selectPumps(defcon[requestedPumps])
+pumpSelection == /\selectPumps(defcon[requestedPumps])
                  /\ UNCHANGED <<newLevel, states>>
 
 pumpSwitching == /\switchPumps
-                 /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp, requestedStates>>
+                 /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp, requestedStates, timesActivated>>
 
-pumpStatusCheck == /\ \E p \in PUMPS : \/ successON(p)
-                                       \/ successOFF(p)
-                                       \/ failureON(p)
-                                       \/ failureOFF(p)
-                   /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp>>
+pumpStatusChange == /\ \E p \in PUMPS : \/ successON(p)
+                                        \/ successOFF(p)
+                                        \/ failureON(p)
+                                        \/ failureOFF(p)
+                   /\ UNCHANGED <<newLevel, requestedPumps, onp, ofp, timesActivated>>
+
+waterLevelChange == /\waterLevelUp \/ waterLevelDown
+                    /\UNCHANGED <<states, requestedStates, requestedPumps, onp, ofp, timesActivated>>
 
 algorithmStep == IF Cardinality({p \in PUMPS : states[p] = "ON"}) # requestedPumps
                  THEN pumpSwitching
-                 ELSE pumpSelection \/ pumpStatusCheck
+                 ELSE pumpSelection
 
 WPNext == /\ oldLevel' = newLevel
           /\ \/ algorithmStep
-             \/ waterLevelUp
-             \/ waterLevelDown
+             \/ pumpStatusChange
+             \/ waterLevelChange
 
-Spec == WPInit /\[][WPNext]_<< states, requestedStates, requestedPumps, onp, ofp, newLevel, oldLevel >>
+Spec == WPInit /\[][WPNext]_<< states, requestedStates, requestedPumps, onp, ofp, newLevel, oldLevel, timesActivated >>
 =============================================================================
 \* Modification History
 \* Last modified Mon Jul 20 19:15:01 BRT 2020 by gabriela
