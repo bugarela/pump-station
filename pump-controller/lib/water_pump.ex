@@ -5,6 +5,9 @@ defmodule WaterPump do
   @pumps [0, 1, 2, 3, 4]
   def pumps, do: @pumps
 
+  @alternatio_n_pumps [0, 1, 2]
+  def alternatio_n_pumps, do: @alternatio_n_pumps
+
   @thresholds %{
     "x0" => 1,
     "x1" => 10,
@@ -26,12 +29,6 @@ defmodule WaterPump do
     variables[:new_level] < @thresholds["x1"]
   end
 
-  def defcon6(variables) do
-    %{
-      requested_pumps: 6
-    }
-  end
-
   def defcon5_condition(variables) do
     Enum.any?([
       Enum.all?([
@@ -43,38 +40,6 @@ defmodule WaterPump do
         @thresholds["x1"] <= variables[:new_level]
       ])
     ])
-  end
-
-  def defcon5(variables) do
-    Map.merge(
-      %{
-        requested_pumps: 5
-      },
-      decide_action(
-        List.flatten([
-          %{
-            action:
-              "ActionAnd [Condition \(Gte \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x2\"\)\)\),Condition \(Gt \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x2\"\)\) \(Arith \(Ref \"newLevel\"\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] >= @thresholds["x2"],
-                @thresholds["x2"] > variables[:new_level]
-              ]),
-            state: %{}
-          },
-          %{
-            action:
-              "ActionAnd [Condition \(Lt \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x1\"\)\)\),Condition \(Lte \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x1\"\)\) \(Arith \(Ref \"newLevel\"\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] < @thresholds["x1"],
-                @thresholds["x1"] <= variables[:new_level]
-              ]),
-            state: %{}
-          }
-        ])
-      )
-    )
   end
 
   def defcon4_condition(variables) do
@@ -89,39 +54,6 @@ defmodule WaterPump do
         @thresholds["x3"] > variables[:new_level]
       ])
     ])
-  end
-
-  def defcon4(variables) do
-    Map.merge(
-      %{
-        requested_pumps: 4
-      },
-      decide_action(
-        List.flatten([
-          %{
-            action:
-              "ActionAnd [Condition \(Lt \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x5\"\)\)\),Condition \(Lte \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x5\"\)\) \(Arith \(Ref \"newLevel\"\)\)\),Condition \(Gt \(Arith \(Ref \"requestedPumps\"\)\) \(Arith \(Num 4\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] < @thresholds["x5"],
-                @thresholds["x5"] <= variables[:new_level],
-                variables[:requested_pumps] > 4
-              ]),
-            state: %{}
-          },
-          %{
-            action:
-              "ActionAnd [Condition \(Gte \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x3\"\)\)\),Condition \(Gt \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x3\"\)\) \(Arith \(Ref \"newLevel\"\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] >= @thresholds["x3"],
-                @thresholds["x3"] > variables[:new_level]
-              ]),
-            state: %{}
-          }
-        ])
-      )
-    )
   end
 
   def defcon_plus1_condition(variables) do
@@ -142,51 +74,6 @@ defmodule WaterPump do
         variables[:requested_pumps] < 3
       ])
     ])
-  end
-
-  def defcon_plus1(variables) do
-    Map.merge(
-      %{
-        requested_pumps: variables[:requested_pumps] + 1
-      },
-      decide_action(
-        List.flatten([
-          %{
-            action:
-              "ActionAnd [Condition \(Gte \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x7\"\)\)\),Condition \(Gt \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x7\"\)\) \(Arith \(Ref \"newLevel\"\)\)\),Condition \(Lt \(Arith \(Ref \"requestedPumps\"\)\) \(Arith \(Num 1\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] >= @thresholds["x7"],
-                @thresholds["x7"] > variables[:new_level],
-                variables[:requested_pumps] < 1
-              ]),
-            state: %{}
-          },
-          %{
-            action:
-              "ActionAnd [Condition \(Gte \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x6\"\)\)\),Condition \(Gt \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x6\"\)\) \(Arith \(Ref \"newLevel\"\)\)\),Condition \(Lt \(Arith \(Ref \"requestedPumps\"\)\) \(Arith \(Num 2\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] >= @thresholds["x6"],
-                @thresholds["x6"] > variables[:new_level],
-                variables[:requested_pumps] < 2
-              ]),
-            state: %{}
-          },
-          %{
-            action:
-              "ActionAnd [Condition \(Gte \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x4\"\)\)\),Condition \(Gt \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x4\"\)\) \(Arith \(Ref \"newLevel\"\)\)\),Condition \(Lt \(Arith \(Ref \"requestedPumps\"\)\) \(Arith \(Num 3\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] >= @thresholds["x4"],
-                @thresholds["x4"] > variables[:new_level],
-                variables[:requested_pumps] < 3
-              ]),
-            state: %{}
-          }
-        ])
-      )
-    )
   end
 
   def defcon_minus1_condition(variables) do
@@ -213,120 +100,32 @@ defmodule WaterPump do
     ])
   end
 
-  def defcon_minus1(variables) do
-    Map.merge(
-      %{
-        requested_pumps: variables[:requested_pumps] - 1
-      },
-      decide_action(
-        List.flatten([
-          %{
-            action:
-              "ActionAnd [Condition \(Lt \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x11\"\)\)\),Condition \(Lte \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x11\"\)\) \(Arith \(Ref \"newLevel\"\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] < @thresholds["x11"],
-                @thresholds["x11"] <= variables[:new_level]
-              ]),
-            state: %{}
-          },
-          %{
-            action:
-              "ActionAnd [Condition \(Lt \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x10\"\)\)\),Condition \(Lte \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x10\"\)\) \(Arith \(Ref \"newLevel\"\)\)\),Condition \(Gt \(Arith \(Ref \"requestedPumps\"\)\) \(Arith \(Num 1\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] < @thresholds["x10"],
-                @thresholds["x10"] <= variables[:new_level],
-                variables[:requested_pumps] > 1
-              ]),
-            state: %{}
-          },
-          %{
-            action:
-              "ActionAnd [Condition \(Lt \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x9\"\)\)\),Condition \(Lte \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x9\"\)\) \(Arith \(Ref \"newLevel\"\)\)\),Condition \(Gt \(Arith \(Ref \"requestedPumps\"\)\) \(Arith \(Num 2\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] < @thresholds["x9"],
-                @thresholds["x9"] <= variables[:new_level],
-                variables[:requested_pumps] > 2
-              ]),
-            state: %{}
-          },
-          %{
-            action:
-              "ActionAnd [Condition \(Lt \(Arith \(Ref \"oldLevel\"\)\) \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x8\"\)\)\),Condition \(Lte \(Index \(Arith \(Ref \"THRESHOLDS\"\)\) \(Str \"x8\"\)\) \(Arith \(Ref \"newLevel\"\)\)\),Condition \(Gt \(Arith \(Ref \"requestedPumps\"\)\) \(Arith \(Num 3\)\)\)\]",
-            condition:
-              Enum.all?([
-                variables[:old_level] < @thresholds["x8"],
-                @thresholds["x8"] <= variables[:new_level],
-                variables[:requested_pumps] > 3
-              ]),
-            state: %{}
-          }
-        ])
-      )
-    )
-  end
-
   def defcon0_condition(variables) do
     variables[:new_level] > @thresholds["xn"]
   end
 
-  def defcon0(variables) do
-    %{
-      requested_pumps: 0
-    }
-  end
-
-  def defcon_condition(variables) do
-    Enum.any?([
-      defcon6_condition(variables),
-      defcon5_condition(variables),
-      defcon4_condition(variables),
-      defcon_plus1_condition(variables),
-      defcon_minus1_condition(variables)
-    ])
-  end
-
   def defcon(variables) do
-    decide_action(
-      List.flatten([
-        %{
-          action: "defcon6()",
-          condition: defcon6_condition(variables),
-          state: defcon6(variables)
-        },
-        %{
-          action: "defcon5()",
-          condition: defcon5_condition(variables),
-          state: defcon5(variables)
-        },
-        %{
-          action: "defcon4()",
-          condition: defcon4_condition(variables),
-          state: defcon4(variables)
-        },
-        %{
-          action: "defconPlus1()",
-          condition: defcon_plus1_condition(variables),
-          state: defcon_plus1(variables)
-        },
-        %{
-          action: "defconMinus1()",
-          condition: defcon_minus1_condition(variables),
-          state: defcon_minus1(variables)
-        }
-      ])
-    )
+    cond do
+      defcon6_condition(variables) -> 6
+      defcon5_condition(variables) -> 5
+      defcon0_condition(variables) -> 0
+      defcon_plus1_condition(variables) -> variables[:requested_pumps] + 1
+      defcon_minus1_condition(variables) -> variables[:requested_pumps] - 1
+      true -> variables[:requested_pumps]
+    end
   end
 
   def activate_condition(variables, p) do
     Enum.all?([
       variables[:states][p] == "OFF",
-      if(p >= 0 and p < 3,
+      if(Enum.member?(@alternatio_n_pumps, p),
         do: variables[:onp] == p,
         else:
-          Enum.all?(0..2, fn i -> not Enum.member?(MapSet.new(["OFF"]), variables[:states][i]) end)
+          if(p == 3,
+            do:
+              Enum.all?(@alternatio_n_pumps, fn i -> variables[:requested_states][i] != "OFF" end),
+            else: Enum.all?(0..3, fn i -> variables[:requested_states][i] != "OFF" end)
+          )
       )
     ])
   end
@@ -337,13 +136,17 @@ defmodule WaterPump do
         requested_states: Map.put(variables[:requested_states], p, "ON"),
         ofp: variables[:ofp]
       },
-      if(p >= 0 and p < 3,
+      if(Enum.member?(@alternatio_n_pumps, p),
         do: %{
           onp: rem(p + 1, 3)
         },
-        else: %{
-          onp: variables[:onp]
-        }
+        else:
+          if(p == 3,
+            do: %{},
+            else: %{
+              onp: variables[:onp]
+            }
+          )
       )
     )
   end
@@ -351,15 +154,13 @@ defmodule WaterPump do
   def deactivate_condition(variables, p) do
     Enum.all?([
       variables[:states][p] == "ON",
-      if(p >= 0 and p < 3,
+      if(Enum.member?(@alternatio_n_pumps, p),
         do:
           Enum.all?([
-            Enum.all?(3..4, fn i ->
-              not Enum.member?(MapSet.new(["ON"]), variables[:states][i])
-            end),
+            Enum.all?(3..4, fn i -> variables[:requested_states][i] != "ON" end),
             variables[:ofp] == p
           ]),
-        else: True
+        else: false
       )
     ])
   end
@@ -370,7 +171,7 @@ defmodule WaterPump do
         requested_states: Map.put(variables[:requested_states], p, "OFF"),
         onp: variables[:onp]
       },
-      if(p >= 0 and p < 3,
+      if(Enum.member?(@alternatio_n_pumps, p),
         do: %{
           ofp: rem(p + 1, 3)
         },
@@ -381,53 +182,71 @@ defmodule WaterPump do
     )
   end
 
-  def select_pumps_condition(variables) do
+  def select_pumps_condition(variables, pumpCount) do
     Enum.all?([
       Enum.all?(@pumps, fn p ->
         not Enum.member?(MapSet.new(["STARTING", "STOPPING"]), variables[:states][p])
       end),
-      Enum.count(Enum.filter(@pumps, fn p -> variables[:requested_states][p] == "ON" end)) !=
-        variables[:requested_pumps],
-      if(
-        Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) <
-          variables[:requested_pumps],
+      if(Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) < pumpCount,
         do: Enum.any?(@pumps, fn p -> activate_condition(variables, p) end),
-        else: Enum.any?(@pumps, fn p -> deactivate_condition(variables, p) end)
+        else:
+          if(
+            Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) >
+              pumpCount,
+            do: Enum.any?(@pumps, fn p -> deactivate_condition(variables, p) end),
+            else: false
+          )
       )
     ])
   end
 
-  def select_pumps(variables) do
-    if Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) <
-         variables[:requested_pumps],
-       do:
-         decide_action(
-           List.flatten([
-             Enum.map(@pumps, fn p ->
-               [
-                 %{
-                   action: "activate(#{inspect(p)})",
-                   condition: activate_condition(variables, p),
-                   state: activate(variables, p)
-                 }
-               ]
-             end)
-           ])
-         ),
-       else:
-         decide_action(
-           List.flatten([
-             Enum.map(@pumps, fn p ->
-               [
-                 %{
-                   action: "deactivate(#{inspect(p)})",
-                   condition: deactivate_condition(variables, p),
-                   state: deactivate(variables, p)
-                 }
-               ]
-             end)
-           ])
-         )
+  def select_pumps(variables, pumpCount) do
+    Map.merge(
+      %{
+        requested_pumps: pumpCount
+      },
+      if(Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) < pumpCount,
+        do:
+          decide_action(
+            List.flatten([
+              Enum.map(@pumps, fn p ->
+                [
+                  %{
+                    action: "activate(#{inspect(p)})",
+                    condition: activate_condition(variables, p),
+                    state: activate(variables, p)
+                  }
+                ]
+              end)
+            ])
+          ),
+        else:
+          if(
+            Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) >
+              pumpCount,
+            do:
+              decide_action(
+                List.flatten([
+                  Enum.map(@pumps, fn p ->
+                    [
+                      %{
+                        action: "deactivate(#{inspect(p)})",
+                        condition: deactivate_condition(variables, p),
+                        state: deactivate(variables, p)
+                      }
+                    ]
+                  end)
+                ])
+              ),
+            else: %{
+              states: variables[:states],
+              requested_states: variables[:requested_states],
+              ofp: variables[:ofp],
+              onp: variables[:onp]
+            }
+          )
+      )
+    )
   end
 
   def success_on_condition(variables, p) do
@@ -522,64 +341,36 @@ defmodule WaterPump do
   end
 
   def water_level_up_condition(variables) do
-    True
+    true
   end
 
   def water_level_up(variables) do
     %{
-      new_level: variables[:new_level] + 10,
-      states: variables[:states],
-      requested_states: variables[:requested_states],
-      requested_pumps: variables[:requested_pumps],
-      onp: variables[:onp],
-      ofp: variables[:ofp]
+      new_level: variables[:new_level] + 10
     }
   end
 
   def water_level_down_condition(variables) do
-    True
+    true
   end
 
   def water_level_down(variables) do
     %{
-      new_level: variables[:new_level] - 10,
-      states: variables[:states],
-      requested_states: variables[:requested_states],
-      requested_pumps: variables[:requested_pumps],
-      onp: variables[:onp],
-      ofp: variables[:ofp]
+      new_level: variables[:new_level] - 10
     }
   end
 
-  def defcon_calculation_condition(variables) do
-    defcon_condition(variables)
-  end
-
-  def defcon_calculation(variables) do
-    Map.merge(
-      %{
-        new_level: variables[:new_level],
-        states: variables[:states],
-        requested_states: variables[:requested_states],
-        onp: variables[:onp],
-        ofp: variables[:ofp]
-      },
-      defcon(variables)
-    )
-  end
-
   def pump_selection_condition(variables) do
-    select_pumps_condition(variables)
+    select_pumps_condition(variables, defcon(variables))
   end
 
   def pump_selection(variables) do
     Map.merge(
       %{
         new_level: variables[:new_level],
-        states: variables[:states],
-        requested_pumps: variables[:requested_pumps]
+        states: variables[:states]
       },
-      select_pumps(variables)
+      select_pumps(variables, defcon(variables))
     )
   end
 
@@ -600,7 +391,7 @@ defmodule WaterPump do
     )
   end
 
-  def pump_status_check_condition(variables) do
+  def pump_status_change_condition(variables) do
     Enum.any?(@pumps, fn p ->
       Enum.any?([
         success_on_condition(variables, p),
@@ -611,7 +402,7 @@ defmodule WaterPump do
     end)
   end
 
-  def pump_status_check(variables) do
+  def pump_status_change(variables) do
     Map.merge(
       %{
         new_level: variables[:new_level],
@@ -625,7 +416,7 @@ defmodule WaterPump do
             [
               %{
                 action:
-                  "ActionOr [ActionCall \"successON\" [\"p\"\],ActionCall \"successOFF\" [\"p\"\],ActionCall \"failureON\" [\"p\"\],ActionCall \"failureOFF\" [\"p\"\]\]",
+                  "ActionOr [ActionCall \"successON\" [Arith \(Ref \"p\"\)\],ActionCall \"successOFF\" [Arith \(Ref \"p\"\)\],ActionCall \"failureON\" [Arith \(Ref \"p\"\)\],ActionCall \"failureOFF\" [Arith \(Ref \"p\"\)\]\]",
                 condition:
                   Enum.any?([
                     success_on_condition(variables, p),
@@ -666,8 +457,39 @@ defmodule WaterPump do
     )
   end
 
+  def water_level_change_condition(variables) do
+    Enum.any?([water_level_up_condition(variables), water_level_down_condition(variables)])
+  end
+
+  def water_level_change(variables) do
+    Map.merge(
+      %{
+        states: variables[:states],
+        requested_states: variables[:requested_states],
+        requested_pumps: variables[:requested_pumps],
+        onp: variables[:onp],
+        ofp: variables[:ofp]
+      },
+      decide_action(
+        List.flatten([
+          %{
+            action: "waterLevelUp()",
+            condition: water_level_up_condition(variables),
+            state: water_level_up(variables)
+          },
+          %{
+            action: "waterLevelDown()",
+            condition: water_level_down_condition(variables),
+            state: water_level_down(variables)
+          }
+        ])
+      )
+    )
+  end
+
+  #  Spec == WPInit /\[][WPNext]_<< states, requestedStates, requestedPumps, onp, ofp, newLevel, oldLevel >>
   def main(variables) do
-    IO.inspect(variables)
+    IO.puts(inspect(variables))
 
     main(
       Map.merge(
@@ -677,34 +499,31 @@ defmodule WaterPump do
         decide_action(
           List.flatten([
             %{
-              action: "defconCalculation()",
-              condition: defcon_calculation_condition(variables),
-              state: defcon_calculation(variables)
+              action: "algorithmStep()",
+              condition:
+                if(
+                  Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) !=
+                    variables[:requested_pumps],
+                  do: pump_switching_condition(variables),
+                  else: pump_selection_condition(variables)
+                ),
+              state:
+                if(
+                  Enum.count(Enum.filter(@pumps, fn p -> variables[:states][p] == "ON" end)) !=
+                    variables[:requested_pumps],
+                  do: pump_switching(variables),
+                  else: pump_selection(variables)
+                )
             },
             %{
-              action: "pumpSelection()",
-              condition: pump_selection_condition(variables),
-              state: pump_selection(variables)
+              action: "pumpStatusChange()",
+              condition: pump_status_change_condition(variables),
+              state: pump_status_change(variables)
             },
             %{
-              action: "pumpSwitching()",
-              condition: pump_switching_condition(variables),
-              state: pump_switching(variables)
-            },
-            %{
-              action: "pumpStatusCheck()",
-              condition: pump_status_check_condition(variables),
-              state: pump_status_check(variables)
-            },
-            %{
-              action: "waterLevelUp()",
-              condition: water_level_up_condition(variables),
-              state: water_level_up(variables)
-            },
-            %{
-              action: "waterLevelDown()",
-              condition: water_level_down_condition(variables),
-              state: water_level_down(variables)
+              action: "waterLevelChange()",
+              condition: water_level_change_condition(variables),
+              state: water_level_change(variables)
             }
           ])
         )
